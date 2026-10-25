@@ -186,7 +186,10 @@ cd ../shici && gradle assembleDebug
 
 ---
 
-## 七、发布到 GitHub（两种方式）
+## 七、GitHub 发布指南（仓库已建好，实操更新见第九节）
+
+> **仓库已上线**：https://github.com/hzh3516927436-dotcom/shici-app （Public）
+> Release v1.0 已附 APK；日常更新流程与故障排查**直接照抄第九节**。
 
 ### 7.0 先做：创建 `.gitignore`（项目根目录，内容如下）
 ```gitignore
@@ -248,3 +251,62 @@ git add . && git commit -m "说明改了什么" && git push
 1. **改数据走管线**（5.2/5.3 的脚本都是幂等的），别手改 bulk 分块文件——重跑导入会覆盖手改。
 2. **改代码先读第四节**，两次重大事故（随机闪退、诗人页 ANR）都是违反那里的规则造成的。
 3. **每次改动后**：`validate.js` → 同步 assets → `assembleDebug` → 装模拟器实测 → 再交付。
+
+---
+
+## 九、GitHub 实操手册（已配置完成，照抄即可）
+
+**仓库**：https://github.com/hzh3516927436-dotcom/shici-app （Public）
+**账号**：hzh3516927436-dotcom（gh CLI 已登录，凭据存于 Windows 凭据管理器）
+**Release v1.0**：https://github.com/hzh3516927436-dotcom/shici-app/releases/tag/v1.0（附件 shici-v1.0.apk，23,719,609 字节，已核验与本地逐字节一致）
+
+### 9.1 日常更新流程（改完代码/数据后照抄）
+
+```bash
+# 0) 确认梯子开启（本地代理端口 127.0.0.1:33210；若变了按 9.3 重新探测）
+cd <workspace>
+# 1) 若改了数据：同步进工程
+cp data/poems/*.json shici/app/src/main/assets/poems/
+cp data/poems-bulk/*.json shici/app/src/main/assets/bulk/
+# 2) 校验 + 打包 + 实测（JAVA_HOME/ANDROID_HOME 见第二节）
+cd data && node validate.js && cd ../shici
+<workspace>/tools/gradle/gradle-8.9/bin/gradle.bat --no-daemon assembleDebug
+# 3) 提交推送（本仓库 git 已配置走梯子直连，不经过 gh-proxy）
+git add .
+git commit -m "更新说明"
+git push
+```
+
+### 9.2 发新版本（Release + APK）
+
+```bash
+# APK 文件名必须 ASCII（中文名会上传成乱码），显示名放 # 后面
+cp shici/app/build/outputs/apk/debug/app-debug.apk shici-vX.Y.apk
+HTTPS_PROXY=http://127.0.0.1:33210 "C:/Program Files/GitHub CLI/gh.exe" release create vX.Y \
+  "shici-vX.Y.apk#诗词典藏 APK（Android 7.0+）" \
+  --title "诗词典藏 vX.Y" \
+  --notes "更新内容……"
+# 版本号递增：v1.1、v1.2……
+```
+
+### 9.3 故障排查表
+
+| 症状 | 原因与解法 |
+|------|-----------|
+| git push 提示输入用户名 | 梯子没开，或梯子端口变了。重探：`netstat -ano \| findstr LISTENING` 找 127.0.0.1 的可疑端口 → `curl -x http://127.0.0.1:端口 -sI https://github.com` 测通 → `git config --local http.proxy http://127.0.0.1:端口` |
+| gh 命令超时 / 偶发 404 | 命令前加 `HTTPS_PROXY=http://127.0.0.1:33210`（端口变了同步替换）；大文件上传失败就重试（`--clobber`） |
+| push 报 "src refspec main 不匹配" | 分支名不是 main：`git branch -M main` |
+| Release 附件名乱码 | 附件文件名必须 ASCII，显示名放 `#` 之后 |
+| "release not found" | 上传中断可能被回滚：`gh release list` 查看，重建即可（tag 已存在会自动复用） |
+| 全局 url.gh-proxy 重写规则 | 是其他仓库的加速配置，**保持原样勿动**；本仓库已用 local insteadOf 覆盖直连（见 9.4） |
+
+### 9.4 已就绪的一次性配置（勿动；坏了照此重建）
+
+```bash
+git config --local http.proxy http://127.0.0.1:33210      # 本仓库 git 走梯子
+git config --local url."https://github.com/hzh3516927436-dotcom/".insteadOf "https://github.com/hzh3516927436-dotcom/"
+# ↑ 利用"最长前缀优先"覆盖全局 gh-proxy 重写，仅对本仓库直连（gh-proxy 不支持带凭证推送）
+"C:/Program Files/GitHub CLI/gh.exe" auth setup-git        # gh 作为 github.com 凭证助手
+```
+
+> 注意：全局 `url.https://gh-proxy.com/https://github.com/.insteadof` 四条规则是其他仓库的加速配置，**保持原样**。
