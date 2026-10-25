@@ -1,0 +1,24 @@
+# 工具链与构建产物（体积大且可重建，勿提交）
+tools/
+data/corpus/
+data/node_modules/
+shots/
+
+# Gradle / IDE
+.gradle/
+build/
+app/build/
+local.properties
+.idea/
+*.iml
+
+# 构建产物（通过 GitHub Releases 发布）
+*.apk
+
+# 流水线瞬态状态
+data/fill-state.json
+
+# 系统文件
+.DS_Store
+Thumbs.db
+*.tmp
